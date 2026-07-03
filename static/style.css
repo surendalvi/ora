@@ -1138,7 +1138,11 @@ body {
 }
 
 .sidebar.collapsed .logo-main .logo-text {
-    display: none;
+    display: none !important;
+}
+
+.sidebar.collapsed .logo-main .logo-mini-icon {
+    display: block !important;
 }
 
 .sidebar.collapsed .logo-area {
