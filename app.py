@@ -598,13 +598,13 @@ def get_optimization_status():
     cursor.execute("SELECT COUNT(*) as cnt FROM prescriptions WHERE status = 'Active' AND severity IN ('Critical', 'Warning')")
     active_alerts = cursor.fetchone()['cnt']
     
-    yield_val = round(31.2 + 0.12 * (318.0 - tle) + 0.05 * (ff - 130.0), 2)
+    yield_val = round(74.2 + 0.12 * (318.0 - tle) + 0.05 * (ff - 130.0), 2)
     energy_val = round(5.12 + 0.015 * (tle - 315.0) + 0.12 * active_alerts, 2)
     
     status = "OPTIMAL" if active_alerts == 0 else "BLOCKED"
     
     if status == "OPTIMAL":
-        desc = "Safest optimization mode active. Plant parameters are healthy. Current yield is maximized at 31.8% and specific energy minimized at 5.2 GCal/t. Recommend maintaining total feed at 202 T/Hr and TLE temp at 318°C for peak thermal efficiency."
+        desc = f"Safest optimization mode active. Plant parameters are healthy. Current yield is maximized at {yield_val}% and specific energy minimized at 5.2 GCal/t. Recommend maintaining total feed at 202 T/Hr and TLE temp at 318°C for peak thermal efficiency."
     else:
         cursor.execute("SELECT DISTINCT asset_id FROM prescriptions WHERE status = 'Active' AND severity IN ('Critical', 'Warning')")
         assets = [r['asset_id'] for r in cursor.fetchall()]
