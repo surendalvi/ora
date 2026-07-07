@@ -89,7 +89,7 @@
                                     <span class="kpi-value" id="compliance-val">0.0%</span>
                                     <span class="kpi-trend green"><i class="fa-solid fa-circle-check"></i></span>
                                 </div>
-                                <span class="kpi-subtext">December 2023 packages</span>
+                                <span class="kpi-subtext" id="compliance-subtext">December 2023 packages</span>
                             </div>
                         </div>
                         <div class="kpi-card">
@@ -383,15 +383,15 @@
                 <!-- TAB 4: PRESCRIPTIONS & ALERTS FEED -->
                 <section id="tab-prescriptions" class="tab-panel">
                     <div class="prescriptions-summary">
-                        <div class="summary-metric">
+                        <div class="summary-metric critical" id="summary-metric-critical">
                             <span class="count red-glow" id="critical-alert-count">0</span>
                             <span class="label">Critical Issues</span>
                         </div>
-                        <div class="summary-metric">
+                        <div class="summary-metric warning" id="summary-metric-warning">
                             <span class="count orange-glow" id="warning-alert-count">0</span>
                             <span class="label">Warnings</span>
                         </div>
-                        <div class="summary-metric text-muted">
+                        <div class="summary-metric resolved" id="summary-metric-resolved">
                             <span class="count" id="resolved-alert-count">0</span>
                             <span class="label">Resolved Actions</span>
                         </div>

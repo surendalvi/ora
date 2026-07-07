@@ -31,8 +31,8 @@ document.addEventListener("DOMContentLoaded", () => {
     // Calendar Month/Year Selectors
     const mSelect = document.getElementById("calendar-month-select");
     const ySelect = document.getElementById("calendar-year-select");
-    if (mSelect) mSelect.onchange = () => renderCalendar();
-    if (ySelect) ySelect.onchange = () => renderCalendar();
+    if (mSelect) mSelect.onchange = () => fetchSummary();
+    if (ySelect) ySelect.onchange = () => fetchSummary();
 
     // Add Field Modal bindings
     const addParamBtn = document.getElementById("add-parameter-btn");
@@ -91,6 +91,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     
     // Initial fetch summary
+    initPrescriptionsFilter();
     fetchSummary();
 });
 
@@ -212,7 +213,12 @@ function initNavigation() {
 // Fetch dashboard global KPIs
 async function fetchSummary() {
     try {
-        const res = await fetch("/api/dashboard_summary");
+        const monthSelect = document.getElementById("calendar-month-select");
+        const yearSelect = document.getElementById("calendar-year-select");
+        const mVal = monthSelect ? monthSelect.value : "12";
+        const yVal = yearSelect ? yearSelect.value : "2023";
+
+        const res = await fetch(`/api/dashboard_summary?year=${yVal}&month=${mVal}`);
         const data = await res.json();
 
         // Update Overview widgets
@@ -221,6 +227,14 @@ async function fetchSummary() {
         document.getElementById("confidence-val-kpi").innerText = `${data.average_confidence}%`;
         document.getElementById("active-alerts-val").innerText = data.active_alerts;
         document.getElementById("schedule-compliance-text").innerText = `Compliance: ${data.compliance_rate}%`;
+
+        // Update compliance card subtext dynamically
+        const complianceSub = document.getElementById("compliance-subtext");
+        if (complianceSub) {
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            const mIdx = parseInt(mVal) - 1;
+            complianceSub.innerText = `${monthNames[mIdx]} ${yVal} packages`;
+        }
 
         // Update nav badges
         const alertBadge = document.getElementById("alerts-badge");
@@ -260,10 +274,10 @@ async function renderCalendar() {
         
         const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
         
-        // Calculate compliance score
+        // Calculate compliance score: only committed days count as compliant
         const total = data.days.length;
-        const missing = data.days.filter(d => d.status === 'missing').length;
-        const compliance = Math.round(((total - missing) / total) * 100);
+        const committed = data.days.filter(d => d.status === 'committed').length;
+        const compliance = Math.round((committed / total) * 100);
         
         const complianceEl = document.getElementById("schedule-compliance-text");
         if (complianceEl) {
@@ -940,6 +954,33 @@ async function loadChartData() {
 }
 
 // Insights & Diagnostics Cockpit
+let mainPrescriptionFilter = "All";
+
+function initPrescriptionsFilter() {
+    const criticalCard = document.getElementById("summary-metric-critical");
+    const warningCard = document.getElementById("summary-metric-warning");
+    const resolvedCard = document.getElementById("summary-metric-resolved");
+
+    if (criticalCard) {
+        criticalCard.onclick = () => {
+            mainPrescriptionFilter = mainPrescriptionFilter === 'Critical' ? 'All' : 'Critical';
+            loadPrescriptions();
+        };
+    }
+    if (warningCard) {
+        warningCard.onclick = () => {
+            mainPrescriptionFilter = mainPrescriptionFilter === 'Warning' ? 'All' : 'Warning';
+            loadPrescriptions();
+        };
+    }
+    if (resolvedCard) {
+        resolvedCard.onclick = () => {
+            mainPrescriptionFilter = mainPrescriptionFilter === 'Resolved' ? 'All' : 'Resolved';
+            loadPrescriptions();
+        };
+    }
+}
+
 async function loadPrescriptions() {
     const list = document.getElementById("prescriptions-list");
     if (!list) return;
@@ -956,6 +997,24 @@ async function loadPrescriptions() {
         document.getElementById("warning-alert-count").innerText = active.filter(p => p.severity === 'Warning').length;
         document.getElementById("resolved-alert-count").innerText = resolved.length;
 
+        // Update active class on filter cards
+        const metricCards = {
+            'Critical': document.getElementById("summary-metric-critical"),
+            'Warning': document.getElementById("summary-metric-warning"),
+            'Resolved': document.getElementById("summary-metric-resolved")
+        };
+
+        Object.keys(metricCards).forEach(key => {
+            const card = metricCards[key];
+            if (card) {
+                if (mainPrescriptionFilter === key) {
+                    card.classList.add("active");
+                } else {
+                    card.classList.remove("active");
+                }
+            }
+        });
+
         const panelActions = active.filter(p => p.type === 'Panel Action');
         const fieldActions = active.filter(p => p.type === 'Field Action');
         const panelCountEl = document.getElementById("panel-action-count");
@@ -963,19 +1022,34 @@ async function loadPrescriptions() {
         if (panelCountEl) panelCountEl.innerText = panelActions.length;
         if (fieldCountEl) fieldCountEl.innerText = fieldActions.length;
 
-        if (active.length === 0 && resolved.length === 0) {
+        // Apply mainPrescriptionFilter filtering
+        let activeToRender = active;
+        let resolvedToRender = resolved;
+
+        if (mainPrescriptionFilter === 'Critical') {
+            activeToRender = active.filter(p => p.severity === 'Critical');
+            resolvedToRender = [];
+        } else if (mainPrescriptionFilter === 'Warning') {
+            activeToRender = active.filter(p => p.severity === 'Warning');
+            resolvedToRender = [];
+        } else if (mainPrescriptionFilter === 'Resolved') {
+            activeToRender = [];
+            resolvedToRender = resolved;
+        }
+
+        if (activeToRender.length === 0 && resolvedToRender.length === 0) {
             list.innerHTML = `
                 <div class="empty-state">
                     <i class="fa-solid fa-square-check empty-icon" style="color: var(--color-success)"></i>
-                    <h3>All Asset Parameters Healthy</h3>
-                    <p>No operational deviations, boundary breaches, or predictive maintenance warnings detected.</p>
+                    <h3>No matching prescriptions found</h3>
+                    <p>Select another category or reset filters to display more insights.</p>
                 </div>
             `;
             return;
         }
 
         // Render Active prescriptions
-        active.forEach(p => {
+        activeToRender.forEach(p => {
             const card = document.createElement("div");
             card.classList.add("prescription-card", p.severity.toLowerCase());
             
@@ -999,7 +1073,7 @@ async function loadPrescriptions() {
         });
 
         // Render Resolved prescriptions (grayed out)
-        resolved.forEach(p => {
+        resolvedToRender.forEach(p => {
             const card = document.createElement("div");
             card.classList.add("prescription-card", "resolved");
             
@@ -1084,7 +1158,7 @@ function initCategoryPrescriptions(allPrescriptions) {
                         <span class="badge ${p.severity.toLowerCase() === 'critical' ? 'danger' : 'warning'}">${p.severity}</span>
                     </div>
                     <div style="font-size: 11px; margin-bottom: 4px; color: var(--text-muted);"><strong>Deviation:</strong> ${p.insight}</div>
-                    <div style="font-size: 11px; color: #ffffff;"><strong>Action:</strong> ${p.prescription}</div>
+                    <div style="font-size: 11px; color: var(--text-main);"><strong>Action:</strong> ${p.prescription}</div>
                 `;
                 list.appendChild(item);
             });
