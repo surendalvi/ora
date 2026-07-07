@@ -268,16 +268,29 @@ def home():
 
 @app.route('/api/dashboard_summary')
 def get_dashboard_summary():
+    year = request.args.get('year', '2023')
+    month = request.args.get('month', '12')
+    try:
+        y = int(year)
+        m = int(month)
+    except:
+        y = 2023
+        m = 12
+        
+    import calendar
+    num_days = calendar.monthrange(y, m)[1]
+    
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Route Compliance (out of 30 days in December)
-    cursor.execute("SELECT COUNT(DISTINCT parsed_date) as uploaded FROM raw_submissions WHERE status = 'committed'")
+    # Route Compliance (out of actual days in the selected month)
+    prefix = f"{y:04d}-{m:02d}-"
+    cursor.execute("SELECT COUNT(DISTINCT parsed_date) as uploaded FROM raw_submissions WHERE parsed_date LIKE ? AND status = 'committed'", (f"{prefix}%",))
     uploaded_days = cursor.fetchone()['uploaded']
-    compliance_rate = round((uploaded_days / 30.0) * 100, 1)
+    compliance_rate = round((uploaded_days / float(num_days)) * 100, 1)
     
-    # Ingestion rate (average of raw submission confidence)
-    cursor.execute("SELECT AVG(confidence_rate) as avg_conf FROM raw_submissions WHERE status = 'committed'")
+    # Ingestion rate (average of raw submission confidence for the selected month)
+    cursor.execute("SELECT AVG(confidence_rate) as avg_conf FROM raw_submissions WHERE parsed_date LIKE ? AND status = 'committed'", (f"{prefix}%",))
     avg_conf_row = cursor.fetchone()
     avg_conf = round(avg_conf_row['avg_conf'], 1) if avg_conf_row['avg_conf'] else 0.0
     
